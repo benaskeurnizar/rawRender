@@ -1,0 +1,10 @@
+# Build outputs
+builds/
+
+# Visual Studio
+optimization/.vs/
+
+# Backup files
+*.c~
+*.h~
+Game.h~
