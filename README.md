@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 \# rawrender
 
 
@@ -100,3 +101,6 @@ draw\_mesh\_simd(engine, mesh, model\_matrix, buffer, x\_mvp, y\_mvp, z\_mvp, w\
 
 \- Win32 windowing and raw bitmap rendering
 
+=======
+# rawRender
+>>>>>>> 254a638c9994b08ee8b9ed51aa0bfd483ced7770
