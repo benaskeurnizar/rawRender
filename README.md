@@ -21,9 +21,9 @@ The renderer expects mesh data in this format:
 
 typedef struct {
 
-vec3\* vertices;  // flat array, every 3 vertices = 1 triangle
+vec3 vertices;  // flat array, every 3 vertices = 1 triangle
 
- vec3\* normals;   // one normal per vertex, same indexing
+ vec3  normals;   // one normal per vertex, same indexing
 
  int vertex\_count; // must be multiple of 3
 
