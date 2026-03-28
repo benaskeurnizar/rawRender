@@ -21,20 +21,20 @@ The renderer expects mesh data in this format:
 
 typedef struct {
 
-&#x20; vec3\* vertices;  // flat array, every 3 vertices = 1 triangle
+vec3\* vertices;  // flat array, every 3 vertices = 1 triangle
 
-&#x20; vec3\* normals;   // one normal per vertex, same indexing
+ vec3\* normals;   // one normal per vertex, same indexing
 
-&#x20; int vertex\_count; // must be multiple of 3
+ int vertex\_count; // must be multiple of 3
 
-&#x20; mat4 model;
+ mat4 model;
 
 } MeshS;
 
 ```
 Provide your own OBJ loader or any other source that fills this struct. Then call:
 ```c
-draw\_mesh\_simd(engine, mesh, model\_matrix, buffer, x\_mvp, y\_mvp, z\_mvp, w\_mvp, frequency);
+draw_mesh_simd(engine, mesh, model_matrix, buffer, x_mvp, y_mvp, z_mvp, w_mvp, frequency);
 ```
 
 ## What I learned
