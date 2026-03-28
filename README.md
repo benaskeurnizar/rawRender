@@ -1,11 +1,16 @@
 
 A CPU software renderer written from scratch in C. No graphics API. No OpenGL. No DirectX. Every pixel is computed manually and written directly to a Win32 bitmap.
 
-![image 1(screenshots/1.png)
-![image 2](screenshots/2.png)
-![image 3](screenshots/3.png)
-![image 4](screenshots/4.png)
-![image 5](screenshots/cube.png)
+[image 1](screenshots/1.png)
+
+[image 2](screenshots/2.png)
+
+[image 3](screenshots/3.png)
+
+[image 4](screenshots/4.png)
+
+[image 5](screenshots/cube.png)
+
 ## Features
 
 - Edge function rasterizer with incremental traversal
