@@ -1,0 +1,92 @@
+#ifndef GAME_H
+#define GAME_H
+
+#include "MyMath.h"
+
+typedef struct{
+  BITMAPINFO BitMapInfo;
+  void* Memory;
+  float* ZBuffer;
+  int width;
+  int height;
+}BitMap;
+
+typedef struct{
+  vec3 pt1;
+  vec3 pt2;
+  vec3 pt3;
+  vec3 normal;
+  // vec2 uv;
+}Triangle;
+
+typedef struct{
+  Triangle* Triangles;
+  int num_triangles;
+  mat4 model;
+}Mesh;
+
+typedef struct {
+  vec3* vertices;   // [v0, v1, v2, v3, ...]
+  vec3* normals;
+  //vec2* uv;
+  int vertex_count; // multiple of 3
+  mat4 model;
+} MeshS;
+
+typedef struct{
+  mat4 view;
+  vec3 pos;
+  vec3 lookdir;
+  vec3 up;
+  vec3 WorldUp;
+  vec3 right;
+  float yaw;
+  float pitch;
+}Camera;
+
+typedef struct{
+  mat4 proj;
+  LARGE_INTEGER PerformanceFrequency;
+  float render_time;
+  float calc_time;
+  float clip_time;
+  int screenWidth,screenHeight;
+}Renderer;
+
+typedef struct{
+  //bsp_model_t* tree;
+  //face_render* faces;
+  //int num_faces;
+  
+  Camera camera;
+  //Camera debugCamera;
+
+  //LightSource* lights;
+  //int num_lights;
+  
+  Mesh* meshes;
+  MeshS* mesh;
+  int num_meshes;
+}GameWorld;
+
+typedef struct {
+  int mouseX, mouseY;
+  float DPitch,DYaw;
+  int mouseLeftHeld;
+  int mouseRightHeld;
+  int keyW, keyA, keyS, keyD;
+  int keyUp,keyDown,keyRight,keyLeft;
+  int firstMousePress;
+} InputState;
+
+
+typedef struct{
+  Renderer renderer;
+  GameWorld world;
+  InputState input;
+  int first;//TODO: This is to be removed,just for testing!
+  int refresh_rate_hz; // frame per secons
+  int debug_mode;
+}Engine;
+
+#endif

@@ -1,0 +1,326 @@
+#ifndef UNICODE
+#define UNICODE
+#endif 
+
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+
+#include <windows.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "Game.h"
+#include "game.c"
+
+
+
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+
+LARGE_INTEGER PerformanceFrequency;
+float TargetSecondsElapsed;
+double elapsed_time = 0.0;
+
+static int Gwidth;
+static int Gheight;
+
+BitMap GBuffer;
+Engine* GEngine = NULL;
+
+int running = 1;
+int first = 1;
+
+LARGE_INTEGER win32_getWallClock(){
+  LARGE_INTEGER result;
+  QueryPerformanceCounter(&result);
+  return result;
+}
+
+float win32_getSecondsElapsed(Engine* engine,LARGE_INTEGER start,LARGE_INTEGER end){
+  float result =  ((float)(end.QuadPart -start.QuadPart)) / (float)engine->renderer.PerformanceFrequency.QuadPart;
+  return result;
+}
+
+void UpdateBuffer(BitMap* buffer){
+    uint32_t *bufferP = (uint32_t*) buffer->Memory;
+    float* DepthBuffer = buffer->ZBuffer;
+    for(int y=0;y<buffer->height;y++){
+        for(int x=0;x<buffer->width;x++){
+            bufferP[x] = 0x00000000;
+	    DepthBuffer[x] = 999.0;
+        }
+        bufferP += buffer->width;
+	DepthBuffer += buffer->width;
+    }
+}
+
+void ResizeDib(BitMap* buffer,int width,int height){
+    int BytesPerPixel = 4;
+    if(buffer->Memory){
+        VirtualFree(buffer->Memory,0,MEM_RELEASE);
+    }
+    if(buffer->ZBuffer){
+      free(buffer->ZBuffer);
+    }
+    buffer->width = width;
+    buffer->height = height;
+    buffer->BitMapInfo.bmiHeader.biSize = sizeof(buffer->BitMapInfo.bmiHeader) ;
+    buffer->BitMapInfo.bmiHeader.biWidth = width ;
+    buffer->BitMapInfo.bmiHeader.biHeight = -height ;
+    buffer->BitMapInfo.bmiHeader.biPlanes = 1 ;
+    buffer->BitMapInfo.bmiHeader.biBitCount =BytesPerPixel * 8 ;
+    buffer->BitMapInfo.bmiHeader.biCompression = BI_RGB ;
+    buffer->BitMapInfo.bmiHeader.biSizeImage = 0 ;
+    buffer->Memory = VirtualAlloc(0,BytesPerPixel*width*height,MEM_COMMIT,PAGE_READWRITE);
+    memset(buffer->Memory,0x00,BytesPerPixel*width*height);
+    buffer->ZBuffer = (float*)malloc(width*height*sizeof(float));
+    for(int y=0;y<buffer->height;y++){
+      for(int x=0;x<buffer->width;x++){
+	buffer->ZBuffer[y*buffer->width + x] = 999.0;
+      }
+    }
+}
+
+void MUpdateWindow(BitMap* buffer,HDC hdc,int W,int H){
+    int Draw = StretchDIBits(
+                             hdc,
+                             0,
+                             0,
+                             buffer->width,
+                             buffer->height,
+                             0,
+                             0,
+                             W,
+                             H,
+                             buffer->Memory,
+                             &buffer->BitMapInfo,
+                             DIB_RGB_COLORS,
+                             SRCCOPY
+                             );
+    
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+  switch(uMsg){
+  case WM_CREATE:
+    {
+      HDC hdc = GetDC(hwnd);
+      RECT ClientRect;
+      GetClientRect(hwnd,&ClientRect);
+      int width = ClientRect.right - ClientRect.left;
+      int height = ClientRect.bottom - ClientRect.top;
+      Gwidth = width;
+      Gheight = height;
+    }break;
+  case WM_SIZE:
+    {
+      HDC hdc = GetDC(hwnd);
+      RECT ClientRect;
+      GetClientRect(hwnd,&ClientRect);
+      int width = ClientRect.right - ClientRect.left;
+      int height = ClientRect.bottom - ClientRect.top;
+      if(GEngine){
+	GEngine->renderer.screenWidth = width;
+	GEngine->renderer.screenHeight = height;
+      }
+      Gwidth = width;
+      Gheight = height;
+      ResizeDib(&GBuffer,width,height);
+      ReleaseDC(hwnd,hdc);
+    }break;
+  case WM_PAINT:
+    {
+      HDC hdc = GetDC(hwnd);
+      RECT ClientRect;
+      GetClientRect(hwnd,&ClientRect);
+      int width = ClientRect.right - ClientRect.left;
+      int height = ClientRect.bottom - ClientRect.top;
+      MUpdateWindow(&GBuffer,hdc,width,height);
+      ReleaseDC(hwnd,hdc);
+    }break;
+  case WM_LBUTTONDOWN:
+    {
+      GEngine->input.mouseLeftHeld = 1;
+    }break;
+  case WM_LBUTTONUP:
+    {
+      GEngine->input.mouseLeftHeld = 0;
+      GEngine->input.firstMousePress = 1;
+    }break;
+  case WM_RBUTTONDOWN:
+    {
+      GEngine->input.mouseRightHeld = 1;
+    }break;
+  case WM_RBUTTONUP:
+    {
+      GEngine->input.mouseRightHeld = 0;
+    }break;
+  case WM_MOUSEMOVE:
+    {
+      if(GEngine){
+	float sensitivity = 0.1;
+	if(GEngine->input.mouseLeftHeld){
+	  if(GEngine->input.firstMousePress){
+	    GEngine->input.mouseX = GET_X_LPARAM(lParam);
+	    GEngine->input.mouseY = GET_Y_LPARAM(lParam);
+	    GEngine->input.firstMousePress = 0;
+	  }else{
+	    int lastX = GET_X_LPARAM(lParam);
+	    int lastY = GET_Y_LPARAM(lParam);
+	    int DX = GEngine->input.mouseX - lastX;
+	    int DY = -(GEngine->input.mouseY - lastY);
+	    GEngine->input.mouseX = lastX ;
+	    GEngine->input.mouseY = lastY ;
+	    GEngine->input.DYaw = DX * sensitivity;
+	    GEngine->input.DPitch = DY * sensitivity;
+	  }
+	}
+      }
+    }break;
+  case WM_KEYDOWN:
+    {
+      if(wParam==0x57){ // W
+        GEngine->input.keyW = 1;
+      }
+      if(wParam==0x53){ //s
+	GEngine->input.keyS = 1;
+      }
+      if(wParam==0x41){//A
+	GEngine->input.keyA = 1;
+      }
+      if(wParam==0x44){//D
+	GEngine->input.keyD = 1;
+      }
+      if(wParam==VK_SPACE){
+	if(!GEngine){
+	  break;
+	}
+	if(GEngine->debug_mode){
+	  GEngine->debug_mode = 0;
+	}else{
+	  GEngine->debug_mode = 1;
+	  //initDebugCamera(&(GEngine->world));
+	}
+      }
+    }break;
+  case WM_KEYUP:
+    {
+      if(wParam==0x57){ // W
+        GEngine->input.keyW = 0;
+      }
+      if(wParam==0x53){ //s
+	GEngine->input.keyS = 0;
+      }
+      if(wParam==0x41){//A
+	GEngine->input.keyA = 0;
+      }
+      if(wParam==0x44){//D
+	GEngine->input.keyD = 0;
+      }
+    }break;
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    return 0;
+        
+  }
+  return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+
+
+int WINAPI wWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,PWSTR pCmdLine,int nCmdShow){
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+  
+  const wchar_t CLASS_NAME[] = L"Game";
+  WNDCLASSW wc = {0};
+  wc.lpfnWndProc = WindowProc;
+  wc.hInstance = hInstance;
+  wc.lpszClassName = CLASS_NAME;
+  int width,height;
+  //MMRESULT timeBeginPriod(1);
+  RegisterClassW(&wc);
+  HWND hwnd = CreateWindowExW(
+			      0,                              // Optional window styles.
+			      CLASS_NAME,                     // Window class
+			      L"quake",    // Window text
+			      WS_OVERLAPPEDWINDOW,            // Window style
+                                
+			      // Size and position
+			      CW_USEDEFAULT, CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,
+                                
+			      NULL,       // Parent window    
+			      NULL,       // Menu
+			      hInstance,  // Instance handle
+			      NULL        // Additional application data
+			      );
+    
+  if (hwnd == NULL)
+    {
+      return 0;
+    }
+  QueryPerformanceFrequency(&PerformanceFrequency);
+  ShowWindow(hwnd, nCmdShow);
+  LARGE_INTEGER lastCounter,lastUpdateCounter,endUpdateCounter;
+  double ms_update;
+  QueryPerformanceCounter(&lastCounter);
+  while(running){
+    MSG message;
+    while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE)) {
+      if (message.message == WM_QUIT) {
+	running = 0;
+      } else {
+	TranslateMessage(&message);
+	DispatchMessage(&message);
+      }
+    }
+    if(first){
+      GameInit(Gwidth,Gheight,&GEngine);
+      GEngine->renderer.PerformanceFrequency = PerformanceFrequency;
+      TargetSecondsElapsed = 1.0f / GEngine->refresh_rate_hz;
+      first = 0;
+	
+    }else{
+      HDC hdc = GetDC(hwnd);
+      QueryPerformanceCounter(&lastUpdateCounter);
+      GameUpdate(GEngine,elapsed_time);
+      UpdateBuffer(&GBuffer);
+      QueryPerformanceCounter(&endUpdateCounter);
+      float  ms_update = ((float)(endUpdateCounter.QuadPart - lastUpdateCounter.QuadPart)*1000)/ (float)PerformanceFrequency.QuadPart;
+      GameRender(GEngine,&GBuffer,PerformanceFrequency);
+      RECT ClientRect;
+      GetClientRect(hwnd,&ClientRect);
+      int width = ClientRect.right - ClientRect.left;
+      int height = ClientRect.bottom - ClientRect.top;
+      MUpdateWindow(&GBuffer,hdc,width,height);
+      ReleaseDC(hwnd,hdc);
+    }
+    LARGE_INTEGER WorkCounter = win32_getWallClock();
+    float workSecondsElapsed = win32_getSecondsElapsed(GEngine,lastCounter, WorkCounter);
+    if(workSecondsElapsed < TargetSecondsElapsed){
+      while(workSecondsElapsed < TargetSecondsElapsed){
+	DWORD sleepMs = (DWORD)(1000.0 * (TargetSecondsElapsed - workSecondsElapsed));
+	//Sleep(sleepMs);
+	WorkCounter = win32_getWallClock();
+	workSecondsElapsed = win32_getSecondsElapsed(GEngine,lastCounter,WorkCounter);
+      }
+    }else{
+      //TODO: missed frame!
+    }
+    ms_update = ((double)(endUpdateCounter.QuadPart - lastUpdateCounter.QuadPart) * 1000.0) / (double)PerformanceFrequency.QuadPart;
+    LARGE_INTEGER endCounter;
+    QueryPerformanceCounter(&endCounter);
+    int counterElapsed = (int)(endCounter.QuadPart - lastCounter.QuadPart);
+    double ms_elapsed = ((double)(endCounter.QuadPart - lastCounter.QuadPart)*1000)/ (double)PerformanceFrequency.QuadPart;
+    int FPS = PerformanceFrequency.QuadPart/counterElapsed;
+    wchar_t buf2[265];
+    swprintf(buf2,265,L"update_time : %.4fMS, calc_time = %.4fMS, clip_time = %.4fMS, render_time = %.4fMS, total = %.4fMS, %dFPS\n",ms_update,GEngine->renderer.calc_time,GEngine->renderer.clip_time,GEngine->renderer.render_time,ms_elapsed,FPS);
+    OutputDebugStringW(buf2);
+    GEngine->renderer.render_time = 0;
+    GEngine->renderer.calc_time = 0;
+    GEngine->renderer.clip_time = 0;
+    lastCounter = endCounter;
+  }
+  return 0;
+}

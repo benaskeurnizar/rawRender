@@ -1,0 +1,159 @@
+#include "MyMath.h"
+#include <stdlib.h>
+#include <math.h>
+
+void vec3_normalize(vec3 v)
+{
+    float len = sqrtf(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    if (len != 0.0f) {
+        v[0] /= len;
+        v[1] /= len;
+        v[2] /= len;
+    }
+}
+
+void mat4_identity(mat4 m){
+  for(int i=0;i<4;i++){
+    for(int j=0;j<4;j++){
+      if(i==j){
+	m[i][j] = 1.0;
+      }else{
+	m[i][j] = 0.0;
+      }
+    }
+  }
+}
+void vec3_mul(vec3 a, vec3 b, vec3 out)
+{
+    out[0] = a[0] * b[0];
+    out[1] = a[1] * b[1];
+    out[2] = a[2] * b[2];
+}
+float vec3_dot(vec3 a, vec3 b)
+{
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+void vec3_add(vec3 a, vec3 b, vec3 out)
+{
+    out[0] = a[0] + b[0];
+    out[1] = a[1] + b[1];
+    out[2] = a[2] + b[2];
+}
+void vec3_sub(vec3 a, vec3 b, vec3 out)
+{
+    out[0] = a[0] - b[0];
+    out[1] = a[1] - b[1];
+    out[2] = a[2] - b[2];
+}
+void vec3_cross(vec3 a, vec3 b, vec3 out)
+{
+    out[0] = a[1]*b[2] - a[2]*b[1];
+    out[1] = a[2]*b[0] - a[0]*b[2];
+    out[2] = a[0]*b[1] - a[1]*b[0];
+}
+
+void mat4_quickInverse(mat4 m, mat4 out)
+{
+    // Rotation part is upper-left 3×3
+    // Translation is in the last row (m[3][0..2]) for your row-major layout
+
+    // Transpose the rotation part (inverse of a rotation matrix)
+  out[0][0] = m[0][0];
+    out[0][1] = m[1][0];
+    out[0][2] = m[2][0];
+    out[1][0] = m[0][1];
+    out[1][1] = m[1][1];
+    out[1][2] = m[2][1];
+    out[2][0] = m[0][2];
+    out[2][1] = m[1][2];
+    out[2][2] = m[2][2];
+
+    // Compute new translation
+    out[3][0] = -(m[3][0] * out[0][0] + m[3][1] * out[1][0] + m[3][2] * out[2][0]);
+    out[3][1] = -(m[3][0] * out[0][1] + m[3][1] * out[1][1] + m[3][2] * out[2][1]);
+    out[3][2] = -(m[3][0] * out[0][2] + m[3][1] * out[1][2] + m[3][2] * out[2][2]);
+
+    // Set last row/column
+    out[0][3] = 0.0f;
+    out[1][3] = 0.0f;
+    out[2][3] = 0.0f;
+    out[3][3] = 1.0f;
+}
+
+void vec3_mul_f(vec3 v, float f, vec3 out)
+{
+    out[0] = v[0] * f;
+    out[1] = v[1] * f;
+    out[2] = v[2] * f;
+}
+
+void mat4_pointAt(vec3 pos, vec3 target, vec3 up, mat4 m) {
+    vec3 forward;
+    forward[0] = target[0] - pos[0];
+    forward[1] = target[1] - pos[1];
+    forward[2] = target[2] - pos[2];
+    vec3_normalize(forward);
+    
+    vec3 a;
+    vec3_mul_f(forward, vec3_dot(up, forward), a);
+    vec3 new_up;
+    vec3_sub(up, a, new_up);
+    vec3_normalize(new_up);
+    
+    vec3 new_right;
+    vec3_cross(forward, new_up, new_right);  // ← CHANGED: forward × up = right
+    vec3_normalize(new_right);  // Add normalization for safety
+    
+    memset(m, 0, sizeof(mat4));
+    m[0][0] = new_right[0];  m[0][1] = new_right[1];  m[0][2] = new_right[2];
+    m[1][0] = new_up[0];     m[1][1] = new_up[1];     m[1][2] = new_up[2];
+    m[2][0] = forward[0];    m[2][1] = forward[1];    m[2][2] = forward[2];
+    m[3][0] = pos[0];        m[3][1] = pos[1];        m[3][2] = pos[2];
+    m[3][3] = 1.0f;  // Don't forget this!
+}
+
+void createProj(float fovy, float aspect, float znear, float zfar,mat4 M){
+  float f = 1/tanf(fovy/2.0f);
+  memset(M,0,sizeof(mat4));
+  M[0][0] = f/aspect;
+  M[1][1] = f;
+  M[2][2] = zfar/(zfar-znear); M[2][3] =1.0f ;
+  M[3][2] = (-zfar*znear/(zfar-znear));
+}
+
+void vec3_copy(vec3 src, vec3 dest)
+{
+    dest[0] = src[0];
+    dest[1] = src[1];
+    dest[2] = src[2];
+}
+
+void mult_mat4_vec3(mat4 mat_in,vec3 vec_in,vec4 o){
+  o[0] = vec_in[0]*mat_in[0][0] + vec_in[1]*mat_in[1][0] + vec_in[2]*mat_in[2][0] + mat_in[3][0];
+  o[1] = vec_in[0]*mat_in[0][1] + vec_in[1]*mat_in[1][1] + vec_in[2]*mat_in[2][1] + mat_in[3][1];
+  o[2] = vec_in[0]*mat_in[0][2] + vec_in[1]*mat_in[1][2] + vec_in[2]*mat_in[2][2] + mat_in[3][2];
+  float w = vec_in[0]*mat_in[0][3] + vec_in[1]*mat_in[1][3] + vec_in[2]*mat_in[2][3] + mat_in[3][3];
+
+  if(w != 0.0f){
+    o[0] /= w;
+    o[1] /= w;
+    o[2] /= w;
+  }
+}
+
+void mult_mat4_vec3R(vec3 vec_in,mat4 mat_in,vec3 o){
+  o[0] = vec_in[0]*mat_in[0][0] + vec_in[1]*mat_in[1][0] + vec_in[2]*mat_in[2][0] + mat_in[3][0];
+  o[1] = vec_in[0]*mat_in[0][1] + vec_in[1]*mat_in[1][1] + vec_in[2]*mat_in[2][1] + mat_in[3][1];
+  o[2] = vec_in[0]*mat_in[0][2] + vec_in[1]*mat_in[1][2] + vec_in[2]*mat_in[2][2] + mat_in[3][2];
+  float w = vec_in[0]*mat_in[0][3] + vec_in[1]*mat_in[1][3] + vec_in[2]*mat_in[2][3] + mat_in[3][3];
+}
+
+void mult_mat4_vec4R(vec4 vec_in,mat4 mat_in,vec4 o){
+  o[0] = vec_in[0]*mat_in[0][0] + vec_in[1]*mat_in[1][0] + vec_in[2]*mat_in[2][0] + vec_in[2]*mat_in[3][0];
+  o[1] = vec_in[0]*mat_in[0][1] + vec_in[1]*mat_in[1][1] + vec_in[2]*mat_in[2][1] + vec_in[2]*mat_in[3][1];
+  o[2] = vec_in[0]*mat_in[0][2] + vec_in[1]*mat_in[1][2] + vec_in[2]*mat_in[2][2] + vec_in[2]*mat_in[3][2];
+  o[3] = vec_in[0]*mat_in[0][3] + vec_in[1]*mat_in[1][3] + vec_in[2]*mat_in[2][3] + vec_in[2]*mat_in[3][3];
+}
+
+
+
